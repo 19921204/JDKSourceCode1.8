@@ -46,7 +46,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     private static final float LOAD_FACTOR = 0.75f;
 
     /**
-     * 链表转树的阀值，如果table[i]下面的链表长度大于8时就转化为数
+     * 链表转树的阀值，如果table[i]下面的链表长度大于8时就转化为树
      */
     static final int TREEIFY_THRESHOLD = 8;
 
@@ -118,7 +118,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     static class Node<K, V> implements Map.Entry<K, V> {
         final int hash;
         final K key;
-        //val和next都会在扩容时发生变化，所以加上volatile来保持可见性和禁止重排序
+        // val和next都会在扩容时发生变化，所以加上volatile来保持可见性和禁止重排序
         volatile V val;
         volatile Node<K, V> next;
 
@@ -149,7 +149,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
             return key + "=" + val;
         }
 
-        //不允许直接改变value的值
+        // 不允许直接改变value的值
         public final V setValue(V value) {
             throw new UnsupportedOperationException();
         }
@@ -301,11 +301,12 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     private transient volatile long baseCount;
 
     /**
+     * 控制标识符
      * 负数代表正在进行初始化或扩容操作 ,其中-1代表正在初始化 ,-N 表示有N-1个线程正在进行扩容操作
      * 正数或0代表hash表还没有被初始化，这个数值表示初始化或下一次进行扩容的大小，类似于扩容阈值。
      * 它的值始终是当前ConcurrentHashMap容量的0.75倍，这与loadfactor是对应的。实际容量>=sizeCtl，则扩容。
      */
-    private transient volatile int sizeCtl;//控制标识符
+    private transient volatile int sizeCtl;
 
     /**
      * The next table index (plus one) to split while resizing.
@@ -520,13 +521,17 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
      * 5、如果table[i]的节点是链表节点，则检查table的第i个位置的链表是否需要转化为数，如果需要则调用treeifyBin函数进行转化
      */
     final V putVal(K key, V value, boolean onlyIfAbsent) {
-        if (key == null || value == null) throw new NullPointerException();// key和value不允许null
-        int hash = spread(key.hashCode());//两次hash，减少hash冲突，可以均匀分布
-        int binCount = 0;//i处结点标志，0: 未加入新结点, 2: TreeBin或链表结点数, 其它：链表结点数。主要用于每次加入结点后查看是否要由链表转为红黑树
-        for (Node<K, V>[] tab = table; ; ) {//CAS经典写法，不成功无限重试
+        // key和value不允许null
+        if (key == null || value == null) throw new NullPointerException();
+        // 两次hash，减少hash冲突，可以均匀分布
+        int hash = spread(key.hashCode());
+        // i处结点标志，0: 未加入新结点, 2: TreeBin或链表结点数, 其它：链表结点数。主要用于每次加入结点后查看是否要由链表转为红黑树
+        int binCount = 0;
+        // CAS经典写法，不成功无限重试
+        for (Node<K, V>[] tab = table; ; ) {
             Node<K, V> f;
             int n, i, fh;
-            //检查是否初始化了，如果没有，则初始化
+            // 检查是否初始化了，如果没有，则初始化
             if (tab == null || (n = tab.length) == 0)
                 tab = initTable();
             /**
